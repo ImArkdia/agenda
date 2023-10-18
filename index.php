@@ -12,7 +12,11 @@
         $valorApellido2 = "";
         $telefono = " ";
         $valorTelefono = "";
+        $valorId = "";
         $borrado = "";
+        $enviado = "";
+        $editado = "";
+
         @$agenda = new mysqli('localhost', 'agenda', 'agenda', 'agenda');
         if ($agenda->connect_errno != null) {
             echo 'Error conectando a la base de datos: ';
@@ -81,31 +85,61 @@
             }
         }
 
-        if(isset($_GET["id"]) && $_GET['editar'] == false){
+        if(isset($_GET["id"])){
+            $valorId = $_GET["id"];
+        }
+
+        if(isset($_GET['editado'])){
+            $editado = 'El contacto se ha modificado correctamente';
+        }
+
+        if(isset($_GET['enviado'])){
+            $enviado = 'El contacto se ha añadido correctamente';
+        }
+
+        $preparedAgenda = $agenda->stmt_init();
+        if((isset($_GET['borrar']) && isset($_GET['borrar']) == true)&& isset($_GET["id"])){
             $id = $_GET['id'];
             $query = "SELECT * FROM contacto WHERE id='".$id."';";
             $resultado = $agenda->query($query);
             if($resultado->num_rows > 0){
-                $query = "DELETE FROM contacto WHERE id='".$id."';";
-                $resultado = $agenda->query($query);
-                header("Location: ./index.php?borrado='true'");
+                $preparedAgenda->prepare("DELETE FROM contacto WHERE id=?;");
+                $preparedAgenda->bind_param("s", $id);
+                $preparedAgenda->execute();
+                $agenda->commit();
+                $preparedAgenda->close();
                 $agenda->close();
+                header("Location: ./index.php?borrado=true");
                 exit();
             }else{
-                header("Location: ./index.php?borrado='false'");
                 $agenda->close();
+                header("Location: ./index.php?borrado=false");
+                exit();
             }
         }
 
+        
         if((isset($_POST['boton']) && $_POST['boton'] == "Enviar") && $flag == true && (isset($_GET['editar']) && $_GET['editar'] == true)){
-            $id = $_GET['id'];
-            
+            $valorId = $_POST['identificador'];
+            $preparedAgenda->prepare("UPDATE contacto SET nombre=?, apellido1=?, apellido2=?, telefono=? WHERE id=?;");
+            $preparedAgenda->bind_param("sssii", $valorNombre, $valorApellido1, $valorApellido2, $valorTelefono, $valorId);
+            $preparedAgenda->execute();
+            $preparedAgenda->close();
+            $agenda->commit();
+            $agenda->close();
+            header("Location: ./index.php?editado=true");
+            exit();
         }else if((isset($_POST['boton']) && $_POST['boton'] == "Enviar") && $flag == true){
-            $query = "INSERT INTO contacto (nombre, apellido1, apellido2, telefono) VALUES (\"".$valorNombre."\", \"".$valorApellido1."\", \"".$valorApellido2."\", \"".$valorTelefono."\");";
-            $agenda->query($query);
-            echo 'Formulario enviado correctamente';
+            $preparedAgenda->prepare("INSERT INTO contacto (nombre, apellido1, apellido2, telefono) VALUES (?, ?, ?, ?);");
+            $preparedAgenda->bind_param("sssi", $valorNombre, $valorApellido1, $valorApellido2, $valorTelefono);
+            //$query = "INSERT INTO contacto (nombre, apellido1, apellido2, telefono) VALUES (\"".$valorNombre."\", \"".$valorApellido1."\", \"".$valorApellido2."\", \"".$valorTelefono."\");";
+            $preparedAgenda->execute();
+            $preparedAgenda->close();
+            $agenda->close();
+            header("Location: ./index.php?insertado=true");
+            exit();
         }else{
-            echo ' 
+            echo '
                 <label for="nombre">Nombre: </label> 
                 <input type="text" name="nombre" id="nombre" value="' . $valorNombre . '"> '.$nombre.'<br><br>
 
@@ -117,9 +151,12 @@
 
                 <label for="telefono">Número de Teléfono: </label>
                 <input type="text" name="telefono" id="telefono" value="' . $valorTelefono . '">'.$telefono.'<br><br>
+                <input type="hidden" name="identificador" id="identificador" value="' . $valorId . '"><br><br>
 
                 <input type="submit" value="Enviar" name="boton"></input><br><br><br>
-                '.$borrado.'<br><br>
+                '.$borrado.'<br>
+                '.$editado.'<br>
+                '.$enviado.'<br><br>
             </form>
             ';
             $query = "SELECT * FROM contacto";
@@ -136,12 +173,13 @@
                         <th>Borrar</th>
                         </tr>';
                 while($contactos = $resultado->fetch_row()){
-                    echo "<tr><td>".$contactos[1]."</td>
+                    echo "<tr>
+                        <td>".$contactos[1]."</td>
                         <td>".$contactos[2]." ".$contactos[3]."</td>
                         <td>".$contactos[4]."</td>
-                        <td><div><a href='index.php?id=".$contactos[0]."?editar=true'>
+                        <td><div><a href='index.php?id=".$contactos[0]."&editar=true'>
                         <img src='./img/editar.png'></div></td>
-                        <td><div><a href='index.php?id=".$contactos[0]."?editar=false'>
+                        <td><div><a href='index.php?id=".$contactos[0]."&borrar=true'>
                         <img src='./img/papelera.png'></div></td></tr>";
                 }
             }
